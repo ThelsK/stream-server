@@ -16,6 +16,27 @@ server.on("request", req => {
   console.log("Connection accepted from:",
     connection.webSocket.remoteAddress)
 
+  const updateStreams = username => {
+
+    // Gather all active connections for this user.
+    const userConnections = connections.filter(connection =>
+      connection.username === username && connection.displayname)
+
+    // Gather all streaming connections for this user.
+    const userStreams = userConnections.filter(connection =>
+      connection.status === "streaming")
+    const userStreamNames = userStreams.map(connection =>
+      connection.devicename)
+
+    // Inform all active connections for this user.
+    userConnections.map(connection =>
+      connection.webSocket.sendUTF(JSON.stringify({
+        type: "streams",
+        streams: userStreamNames,
+      }))
+    )
+  }
+
   connection.webSocket.on("message", async msg => {
     if (msg.type !== "utf8") {
       console.error("Incorrect data:", msg)
@@ -83,34 +104,52 @@ server.on("request", req => {
           return
         }
 
-        const streams = []
-        for (let i = 0; i < connections.length; i++) {
-          if (connection.username !== connections[i].username ||
-            connections[i].devicename) {
-            continue
-          }
+        if (connections.find(compareConnection =>
+          compareConnection.username === connection.username &&
+          compareConnection.devicename &&
+          compareConnection.devicename.toLowerCase() ===
+          data.devicename.trim().toLowerCase())) {
 
-          if (data.devicename.trim().toLowerCase() ===
-            connections[i].devicename.toLowerCase()) {
-            connection.webSocket.sendUTF(JSON.stringify({
-              type: "message",
-              message: "Devicename already in use for your account.",
-            }))
-            return
-          }
-
-          if (connections[i].streaming) {
-            streams.push(connections[i].devicename)
-          }
+          connection.webSocket.sendUTF(JSON.stringify({
+            type: "message",
+            message: "Devicename already in use for your account.",
+          }))
+          return
         }
 
         connection.devicename = data.devicename.trim()
+
         connection.webSocket.sendUTF(JSON.stringify({
           type: "device",
           devicename: data.devicename.trim(),
           message: `Devicename set to "${data.devicename.trim()}".`,
-          streams,
+          streams: connections.filter(compareConnection =>
+            compareConnection.username === username &&
+            compareConnection.devicename &&
+            compareConnection.status === "streaming")
+            .map(compareConnection => compareConnection.devicename),
         }))
+        return
+
+      case "status":
+        if (!connection.username) {
+          connection.webSocket.sendUTF(JSON.stringify({
+            type: "message",
+            message: "Please login or register."
+          }))
+          return
+        }
+
+        if (!connection.devicename) {
+          connection.webSocket.sendUTF(JSON.stringify({
+            type: "message",
+            message: "Please provide a name for your device.",
+          }))
+          return
+        }
+
+        connection.status = data.status.trim()
+        updateStreams(connection.username)
         return
 
       default:
