@@ -26,14 +26,13 @@ server.on("request", req => {
     // Gather all streaming connections for this user.
     const userStreams = userConnections.filter(connection =>
       connection.status === "streaming")
-    const userStreamNames = userStreams.map(connection =>
-      connection.devicename)
+      .map(connection => connection.devicename)
 
     // Inform all active connections for this user.
     userConnections.map(connection =>
       connection.webSocket.sendUTF(JSON.stringify({
         type: "streams",
-        streams: userStreamNames,
+        streams: userStreams,
       }))
     )
   }
@@ -151,6 +150,57 @@ server.on("request", req => {
 
         connection.status = data.status.trim()
         updateStreams(connection.username)
+        return
+
+      case "target":
+        if (!connection.username) {
+          connection.webSocket.sendUTF(JSON.stringify({
+            type: "message",
+            message: "Please login or register."
+          }))
+          return
+        }
+
+        if (!connection.devicename) {
+          connection.webSocket.sendUTF(JSON.stringify({
+            type: "message",
+            message: "Please provide a name for your device.",
+          }))
+          return
+        }
+
+        if (!data.target.trim()) {
+          connection.webSocket.sendUTF(JSON.stringify({
+            type: "message",
+            message: "Please include the target devicename.",
+          }))
+          return
+        }
+
+        if (data.target.trim().toLowerCase() ===
+          connection.devicename.toLowerCase()) {
+          connection.webSocket.sendUTF(JSON.stringify({
+            type: "message",
+            message: "Target devicename cannot match active devicename.",
+          }))
+          return
+        }
+
+        const targetConnection = connections.find(compareConnection =>
+          compareConnection.username === connection.username &&
+          compareConnection.devicename &&
+          compareConnection.devicename.toLowerCase() ===
+          data.target.trim().toLowerCase())
+        if (!targetConnection) {
+          connection.webSocket.sendUTF(JSON.stringify({
+            type: "message",
+            message: "Device not found.",
+          }))
+          return
+        }
+
+        data.payload.senderDevicename = connection.devicename
+        targetConnection.webSocket.sendUTF(JSON.stringify(data.payload))
         return
 
       default:
