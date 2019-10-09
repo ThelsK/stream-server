@@ -5,7 +5,8 @@ const port = process.env.PORT || 6789
 
 // Handle regular web requests with a 404 response.
 const handleWebRequest = (req, res) => {
-  res.writeHead(404).end()
+  res.writeHead(404)
+  res.end()
 }
 
 // Create webserver.
