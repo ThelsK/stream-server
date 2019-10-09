@@ -1,7 +1,7 @@
 const server = require("./server")
 const { register, login } = require("./users")
 
-const connections = []
+let connections = []
 let nextId = 1
 
 // Handle websockets.
@@ -17,10 +17,11 @@ server.on("request", req => {
     connection.webSocket.remoteAddress)
 
   const updateStreams = username => {
+    console.log("Updating Streams.")
 
     // Gather all active connections for this user.
     const userConnections = connections.filter(connection =>
-      connection.username === username && connection.displayname)
+      connection.username === username && connection.devicename)
 
     // Gather all streaming connections for this user.
     const userStreams = userConnections.filter(connection =>
@@ -124,7 +125,7 @@ server.on("request", req => {
           devicename: data.devicename.trim(),
           message: `Devicename set to "${data.devicename.trim()}".`,
           streams: connections.filter(compareConnection =>
-            compareConnection.username === username &&
+            compareConnection.username === connection.username &&
             compareConnection.devicename &&
             compareConnection.status === "streaming")
             .map(compareConnection => compareConnection.devicename),
@@ -155,5 +156,24 @@ server.on("request", req => {
       default:
         console.error("Unknown data:", data)
     }
+  })
+
+  const updateConnections = connection => {
+
+    // Filter the connections on active connections.
+    connections = connections.filter(compareConnection =>
+      compareConnection.webSocket.connected)
+
+    // Update the streams for the same username.
+    updateStreams(connection.username)
+  }
+
+  connection.webSocket.on("close", async () => {
+    updateConnections(connection)
+  })
+
+  connection.webSocket.on("error", async error => {
+    console.error(error)
+    updateConnections(connection)
   })
 })
