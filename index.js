@@ -17,7 +17,6 @@ server.on("request", req => {
     connection.webSocket.remoteAddress)
 
   const updateStreams = username => {
-    console.log("Updating Streams.")
 
     // Gather all active connections for this user.
     const userConnections = connections.filter(connection =>
@@ -201,6 +200,7 @@ server.on("request", req => {
 
         data.payload.senderDevicename = connection.devicename
         targetConnection.webSocket.sendUTF(JSON.stringify(data.payload))
+        console.log("Transmitting direct data:", data)
         return
 
       default:
