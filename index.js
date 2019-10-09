@@ -1,8 +1,8 @@
 const server = require("./server")
-const { register } = require("./users")
+const { register, login } = require("./users")
 
 const connections = []
-const nextId = 1
+let nextId = 1
 
 // Handle websockets.
 server.on("request", req => {
@@ -66,15 +66,16 @@ server.on("request", req => {
           return
         }
 
-        if (connection.device) {
+        if (connection.devicename) {
           connection.webSocket.sendUTF(JSON.stringify({
             type: "message",
-            message: `Device already declared as "${connection.device}".`
+            message: "Devicename already declared as " +
+              `"${connection.devicename}".`
           }))
           return
         }
 
-        if (!data.device.trim()) {
+        if (!data.devicename.trim()) {
           connection.webSocket.sendUTF(JSON.stringify({
             type: "message",
             message: "Please include a name for your device.",
@@ -82,22 +83,33 @@ server.on("request", req => {
           return
         }
 
+        const streams = []
         for (let i = 0; i < connections.length; i++) {
-          if (connection.username === connections[i].username &&
-            data.device.trim().toLowerCase() ===
-            connections[i].device.toLowerCase()) {
+          if (connection.username !== connections[i].username ||
+            connections[i].devicename) {
+            continue
+          }
+
+          if (data.devicename.trim().toLowerCase() ===
+            connections[i].devicename.toLowerCase()) {
             connection.webSocket.sendUTF(JSON.stringify({
               type: "message",
               message: "Devicename already in use for your account.",
             }))
+            return
+          }
+
+          if (connections[i].streaming) {
+            streams.push(connections[i].devicename)
           }
         }
 
-        connection.device = data.device.trim()
+        connection.devicename = data.devicename.trim()
         connection.webSocket.sendUTF(JSON.stringify({
           type: "device",
-          device: data.device.trim(),
-          message: "Devicename declared.",
+          devicename: data.devicename.trim(),
+          message: `Devicename set to "${data.devicename.trim()}".`,
+          streams,
         }))
         return
 

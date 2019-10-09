@@ -57,8 +57,8 @@ const register = async data => {
       }
     }
 
-    const encryptedPassword =
-      await bcrypt.hashSync(data.password.trim().toLowerCase(), 10)
+    const encryptedPassword = await bcrypt
+      .hashSync(data.password.trim().toLowerCase(), 10)
     const user = await User.create({
       username: data.username.trim(),
       password: encryptedPassword,
@@ -66,7 +66,7 @@ const register = async data => {
     return {
       type: "login",
       username: user.username,
-      message: `Registered account ${user.username}`
+      message: `Registered account "${user.username}".`
     }
 
   } catch (error) {
@@ -78,4 +78,59 @@ const register = async data => {
   }
 }
 
-module.exports = { register }
+const login = async data => {
+  try {
+
+    if (!data.username.trim()) {
+      return {
+        type: "message",
+        message: "Please include a username.",
+      }
+    }
+
+    if (!data.password.trim()) {
+      return {
+        type: "message",
+        message: "Please include a password.",
+      }
+    }
+
+    const user = await User.findOne({
+      where: {
+        username: {
+          [Sequelize.Op.iLike]: data.username.trim()
+        }
+      }
+    })
+    if (!user) {
+      return {
+        type: "message",
+        message: "Username not found.",
+      }
+    }
+
+    const conparePassword = await bcrypt
+      .compareSync(data.password.trim().toLowerCase(), user.password)
+    if (!conparePassword) {
+      return {
+        type: "message",
+        message: "Incorrect password.",
+      }
+    }
+
+    return {
+      type: "login",
+      username: user.username,
+      message: `Logged into account "${user.username}".`
+    }
+
+  } catch (error) {
+    console.error(error)
+    return {
+      type: "message",
+      message: "Internal server error.",
+    }
+  }
+}
+
+module.exports = { register, login }
